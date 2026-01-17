@@ -47,9 +47,9 @@ const SECONDS_TO_STOP_ALARM = 10;
 let currentAlarmMinutes = 0; // Start at 12:00 AM (midnight)
 const MAX_MINUTES = 24 * 60 - 1; // 11:59 PM = 1439 minutes
 
-// Dance detection settings - VERY SENSITIVE for small movements
-const MOVEMENT_THRESHOLD = 8; // Very low threshold - detects small movements
-const MOVEMENT_HISTORY_SIZE = 5; // Fewer frames for faster response
+// Dance detection settings - balanced for accuracy
+const MOVEMENT_THRESHOLD = 20; // Higher threshold to avoid false positives from jitter
+const MOVEMENT_HISTORY_SIZE = 6; // More frames for stability
 const MIN_DANCE_FRAMES = 4; // Need consistent movement for this many frames
 
 // Time advancement rate: 1 second of dancing = 1 minute of alarm time
@@ -195,24 +195,32 @@ async function detectPose() {
     requestAnimationFrame(detectPose);
 }
 
-// ===== DANCE ANALYSIS =====
+// ===== IMPROVED DANCE ANALYSIS =====
+
+// Movement velocity history for better detection
+let velocityHistory = [];
+const VELOCITY_HISTORY_SIZE = 8;
 
 function analyzeDanceMovement(pose) {
     const keypoints = pose.keypoints;
 
-    // Check if hands OR legs are visible
+    // Check visibility of key body parts
     const leftWrist = keypoints.find(kp => kp.name === 'left_wrist');
     const rightWrist = keypoints.find(kp => kp.name === 'right_wrist');
     const leftAnkle = keypoints.find(kp => kp.name === 'left_ankle');
     const rightAnkle = keypoints.find(kp => kp.name === 'right_ankle');
     const leftKnee = keypoints.find(kp => kp.name === 'left_knee');
     const rightKnee = keypoints.find(kp => kp.name === 'right_knee');
+    const leftElbow = keypoints.find(kp => kp.name === 'left_elbow');
+    const rightElbow = keypoints.find(kp => kp.name === 'right_elbow');
+    const nose = keypoints.find(kp => kp.name === 'nose');
 
-    const handsVisible = (leftWrist && leftWrist.score > 0.2) || (rightWrist && rightWrist.score > 0.2);
-    const legsVisible = (leftAnkle && leftAnkle.score > 0.2) || (rightAnkle && rightAnkle.score > 0.2) ||
-        (leftKnee && leftKnee.score > 0.2) || (rightKnee && rightKnee.score > 0.2);
+    const handsVisible = (leftWrist && leftWrist.score > 0.15) || (rightWrist && rightWrist.score > 0.15);
+    const legsVisible = (leftAnkle && leftAnkle.score > 0.15) || (rightAnkle && rightAnkle.score > 0.15) ||
+        (leftKnee && leftKnee.score > 0.15) || (rightKnee && rightKnee.score > 0.15);
+    const bodyVisible = (nose && nose.score > 0.3);
 
-    const limbsVisible = handsVisible || legsVisible;
+    const limbsVisible = handsVisible || legsVisible || bodyVisible;
 
     // Show/hide warning
     if (!limbsVisible && handWarning) {
@@ -221,41 +229,87 @@ function analyzeDanceMovement(pose) {
         handWarning.classList.add('hidden');
     }
 
-    // Track movement from limbs (hands, elbows, knees, ankles)
-    let totalMovement = 0;
-    let validPoints = 0;
-    const trackPoints = ['left_wrist', 'right_wrist', 'left_elbow', 'right_elbow',
-        'left_knee', 'right_knee', 'left_ankle', 'right_ankle',
-        'left_shoulder', 'right_shoulder'];
+    // WEIGHTED body part tracking - hands and feet move more when dancing
+    const weightedParts = [
+        { name: 'left_wrist', weight: 2.5 },
+        { name: 'right_wrist', weight: 2.5 },
+        { name: 'left_elbow', weight: 1.5 },
+        { name: 'right_elbow', weight: 1.5 },
+        { name: 'left_ankle', weight: 2.0 },
+        { name: 'right_ankle', weight: 2.0 },
+        { name: 'left_knee', weight: 1.5 },
+        { name: 'right_knee', weight: 1.5 },
+        { name: 'left_shoulder', weight: 1.0 },
+        { name: 'right_shoulder', weight: 1.0 },
+        { name: 'left_hip', weight: 1.2 },
+        { name: 'right_hip', weight: 1.2 },
+        { name: 'nose', weight: 0.8 }
+    ];
+
+    let weightedMovement = 0;
+    let totalWeight = 0;
+    let maxVelocity = 0;
 
     if (lastPose) {
-        trackPoints.forEach(pointName => {
-            const current = keypoints.find(kp => kp.name === pointName);
-            const previous = lastPose.keypoints.find(kp => kp.name === pointName);
+        weightedParts.forEach(part => {
+            const current = keypoints.find(kp => kp.name === part.name);
+            const previous = lastPose.keypoints.find(kp => kp.name === part.name);
 
-            if (current && previous && current.score > 0.2 && previous.score > 0.2) {
+            if (current && previous && current.score > 0.15 && previous.score > 0.15) {
                 const dx = current.x - previous.x;
                 const dy = current.y - previous.y;
-                const movement = Math.sqrt(dx * dx + dy * dy);
-                totalMovement += movement;
-                validPoints++;
+                const velocity = Math.sqrt(dx * dx + dy * dy);
+
+                // Apply weight
+                weightedMovement += velocity * part.weight;
+                totalWeight += part.weight;
+
+                // Track maximum velocity (for detecting sudden movements)
+                if (velocity > maxVelocity) {
+                    maxVelocity = velocity;
+                }
             }
         });
     }
 
     lastPose = pose;
 
-    // Use total movement directly for detection
-    movementHistory.push(totalMovement);
-    if (movementHistory.length > MOVEMENT_HISTORY_SIZE) {
-        movementHistory.shift();
+    // Calculate weighted average velocity
+    const avgVelocity = totalWeight > 0 ? weightedMovement / totalWeight : 0;
+
+    // Combine average and max velocity for better detection
+    // Max velocity helps detect quick jerky dance moves
+    const combinedScore = avgVelocity * 0.6 + maxVelocity * 0.4;
+
+    // Update velocity history with exponential smoothing
+    velocityHistory.push(combinedScore);
+    if (velocityHistory.length > VELOCITY_HISTORY_SIZE) {
+        velocityHistory.shift();
     }
 
-    // Calculate average movement
-    const avgMovement = movementHistory.reduce((a, b) => a + b, 0) / movementHistory.length;
+    // Calculate smoothed movement score with recent frames weighted more
+    let smoothedScore = 0;
+    let weightSum = 0;
+    velocityHistory.forEach((v, i) => {
+        const recencyWeight = (i + 1) / velocityHistory.length; // Recent frames weighted more
+        smoothedScore += v * recencyWeight;
+        weightSum += recencyWeight;
+    });
+    smoothedScore = weightSum > 0 ? smoothedScore / weightSum : 0;
 
-    // Detect dancing based on average movement AND limbs must be visible
-    const isCurrentlyDancing = limbsVisible && avgMovement > MOVEMENT_THRESHOLD;
+    // Dynamic threshold - lower when movement is detected
+    const dynamicThreshold = isDancing ? MOVEMENT_THRESHOLD * 0.7 : MOVEMENT_THRESHOLD;
+
+    // Detect dancing based on smoothed score AND limbs must be visible
+    const isCurrentlyDancing = limbsVisible && smoothedScore > dynamicThreshold;
+
+    // Update status text with movement level for debugging
+    if (limbsVisible && alarmMode === 'setup' && !isDancing) {
+        const movementLevel = Math.min(Math.floor(smoothedScore / MOVEMENT_THRESHOLD * 100), 100);
+        if (movementLevel > 30) {
+            statusText.textContent = `Moving... ${movementLevel}%`;
+        }
+    }
 
     if (isCurrentlyDancing && !isDancing) {
         // Started dancing!
