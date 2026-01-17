@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🕺 Dance Alarm Clock 💃 - Dance to Delay!</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Bangers&family=Outfit:wght@400;600;800&display=swap"
+        rel="stylesheet">
+</head>
+
+<body>
+    <!-- Camera Feed (Background) -->
+    <video id="camera" autoplay playsinline></video>
+    <canvas id="poseCanvas"></canvas>
+
+    <!-- Disco Ball -->
+    <div class="disco-ball">🪩</div>
+
+    <!-- Clock Display (Top Right) -->
+    <div class="clock-container">
+        <div class="clock-label">⏰ ALARM SET FOR</div>
+        <div class="clock-time" id="alarmTime">12:00 AM</div>
+        <div class="current-time-label">Current Time</div>
+        <div class="current-time" id="currentTime">--:-- --</div>
+    </div>
+
+    <!-- Dance Progress Meter (Hidden until started) -->
+    <div class="dance-meter-container hidden" id="danceMeterContainer">
+        <div class="dance-meter-label">🕐 ALARM TIME 🕐</div>
+        <div class="time-markers">
+            <span>12 AM</span>
+            <span>6 AM</span>
+            <span>12 PM</span>
+            <span>6 PM</span>
+            <span>11:59 PM</span>
+        </div>
+        <div class="dance-meter">
+            <div class="dance-meter-fill" id="danceMeterFill"></div>
+            <div class="time-bubble" id="timeBubble">12:00 AM</div>
+        </div>
+        <button id="setAlarmBtn" class="set-alarm-btn">⏰ SET ALARM</button>
+    </div>
+
+    <!-- Hand/Leg Warning -->
+    <div class="hand-warning hidden" id="handWarning">
+        ✋ SHOW HANDS OR LEGS! 🦵
+    </div>
+
+    <!-- Status Indicator -->
+    <div class="status-container">
+        <div class="status-icon" id="statusIcon">😴</div>
+        <div class="status-text" id="statusText">Waiting for camera...</div>
+    </div>
+
+    <!-- Instructions Panel -->
+    <div class="instructions">
+        <div class="dancing-emojis">��🕺💃🕺💃</div>
+        <h1>THE LAZIEST ALARM EVER!</h1>
+        <div class="subtitle">🎵 Dance your way to a late wake-up! 🎵</div>
+        <div class="instruction-text">
+            <p>�️ Too lazy to get up early? <span class="highlight">WE GOT YOU!</span></p>
+            <p>💃 <span class="warning">SHAKE YOUR BODY</span> to push alarm time forward!</p>
+            <p>⏱️ 1 second of dancing = <span class="highlight">1 minute</span> of extra sleep!</p>
+            <!-- <p>🎵 WARNING: <span class="warning">Rickroll included!</span> 😱</p> -->
+        </div>
+        <div class="fun-facts">
+            <p>🤡 Yes, you look silly. No, we don't care! 🤡</p>
+        </div>
+        <button id="startBtn" class="start-btn">🚀 LET'S GET WEIRD!</button>
+    </div>
+
+    <!-- Confetti Container -->
+    <div id="confetti-container"></div>
+
+    <!-- ALARM SET SCREEN (shown after setting alarm) -->
+    <div class="alarm-set-screen hidden" id="alarmSetScreen">
+        <div class="alarm-set-content">
+            <div class="alarm-set-emoji">⏰</div>
+            <h1>ALARM SET!</h1>
+            <div class="alarm-set-time" id="alarmSetTime">12:00 AM</div>
+            <div class="alarm-waiting-text">Waiting for alarm time...</div>
+            <div class="current-time-big" id="currentTimeBig">--:-- --</div>
+            <div class="alarm-tip">💤 Go sleep now! We'll wake you up... eventually! 😈</div>
+            <button id="cancelAlarmBtn" class="cancel-alarm-btn">❌ CANCEL ALARM</button>
+        </div>
+    </div>
+
+    <!-- ALARM RINGING SCREEN (shown when alarm triggers) -->
+    <div class="alarm-ringing-screen hidden" id="alarmRingingScreen">
+        <div class="alarm-ringing-content">
+            <div class="alarm-ringing-emoji">🔔</div>
+            <h1 class="alarm-ringing-title">WAKE UP!!!</h1>
+            <div class="alarm-ringing-subtitle">💃 DANCE FOR 10 SECONDS TO STOP! 🕺</div>
+            <div class="stop-alarm-meter">
+                <div class="stop-alarm-fill" id="stopAlarmFill"></div>
+            </div>
+            <div class="stop-alarm-progress" id="stopAlarmProgress">0 / 10 seconds</div>
+            <div class="dance-status-ringing" id="danceStatusRinging">Start dancing!</div>
+        </div>
+    </div>
+
+    <!-- Hidden Audio -->
+    <audio id="rickroll" src="sound/rickroll.mp3" loop></audio>
+
+    <!-- TensorFlow.js and MoveNet -->
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.2.0/dist/tf.min.js"></script>
+    <script
+        src="https://cdn.jsdelivr.net/npm/@tensorflow-models/pose-detection@2.0.0/dist/pose-detection.min.js"></script>
+    <script src="app.js"></script>
+</body>
+
+</html>
